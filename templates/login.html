@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Secure Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="h-screen flex items-center justify-center">
+        <div class="bg-white shadow-lg rounded-lg p-8 w-96">
+            <h1 class="text-2xl font-bold text-center mb-6 text-blue-500">Login</h1>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input id="username" name="username" type="text" required class="mt-1 block w-full px-4 py-2 border rounded-lg focus:outline-none" />
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg w-full">Login</button>
+            </form>
+            <div id="errorMessage" class="mt-4 text-red-500 text-center hidden"></div>
+            <div class="mt-4 text-center">
+                <a href="/register" class="text-blue-500 hover:underline">Don't have an account? Register here</a>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent default form submission
+            const username = document.getElementById('username').value;
+
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username }) // Envoyer sous format JSON
+            });
+
+            if (response.ok) {
+                // Redirection si succès
+                window.location.href = '/';
+            } else {
+                // Afficher un message d'erreur
+                const data = await response.json();
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = data.error || 'Login failed';
+                errorMessage.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

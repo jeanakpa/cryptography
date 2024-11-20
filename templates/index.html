@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        .user-color {
+            color: var(--user-color);
+        }
+
+        /* Styles pour l'utilisateur sélectionné */
+        .user-selected {
+            background-color: #4f46e5; /* Couleur Indigo plus foncée */
+            color: #ffffff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white py-4 px-6 shadow-md">
+        <h1 class="text-2xl font-bold text-center">TP CRYPTOGRAPHIE ( CHAT CRYPTE )</h1>
+        <p class="text-center text-sm text-indigo-200">Un chat crypté avec RSA et ElGamal</p>
+    </header>
+
+    <!-- Main Chat Section -->
+    <div class="flex flex-col sm:flex-row flex-1 overflow-hidden">
+        <!-- Users List -->
+        <aside class="w-full sm:w-1/4 bg-gray-800 text-white p-4 sm:overflow-y-auto">
+            <h2 class="text-lg font-semibold mb-4 text-center sm:text-left">Utilisateurs Connectés</h2>
+            <ul id="userList" class="space-y-2"></ul>
+        </aside>
+
+        <!-- Chat Section -->
+        <main class="flex-1 flex flex-col bg-white">
+            <!-- Messages Section -->
+            <div id="messageList" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-100">
+                <!-- Messages dynamically appended -->
+            </div>
+
+            <!-- Input Section -->
+            <div class="border-t border-gray-300 bg-gray-50 p-4 flex flex-col sm:flex-row gap-4">
+                <input id="messageInput" 
+                    type="text" 
+                    placeholder="Écrivez un message..." 
+                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base">
+                <select id="encryptionMethod" 
+                    class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base">
+                    <option value="RSA">RSA</option>
+                    <option value="ElGamal">ElGamal</option>
+                </select>
+                <button onclick="sendMessage()" 
+                    class="bg-indigo-500 text-white px-6 py-2 rounded-lg hover:bg-indigo-600 transition text-sm sm:text-base">
+                    Envoyer
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io();
+        const userColors = {};
+
+        // Assign unique color to a user
+        function getUserColor(username) {
+            if (!userColors[username]) {
+                const hue = Math.floor(Math.random() * 360);
+                userColors[username] = `hsl(${hue}, 70%, 50%)`;
+            }
+            return userColors[username];
+        }
+
+        // Register user
+        function register() {
+            const username = prompt("Entrez votre nom d'utilisateur");
+            if (username) {
+                socket.emit('register', { username });
+                document.body.classList.add('chat-active');
+            }
+        }
+
+        // Update user list
+        socket.on('user_list', function(users) {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user;
+                const userColor = getUserColor(user);
+                li.className = 'px-4 py-2 rounded-lg text-center hover:bg-gray-600 transition cursor-pointer';
+                li.style.color = userColor;
+
+                // Ajout du comportement lors du clic
+                li.onclick = () => {
+                    // Désélectionner les autres utilisateurs
+                    document.querySelectorAll('#userList li').forEach(li => li.classList.remove('user-selected'));
+                    // Marquer l'utilisateur comme sélectionné
+                    li.classList.add('user-selected');
+                    li.dataset.selected = user;
+                };
+
+                userList.appendChild(li);
+            });
+        });
+
+        // Send message
+        function sendMessage() {
+            const message = document.getElementById('messageInput').value.trim();
+            const encryptionMethod = document.getElementById('encryptionMethod').value;
+            const recipient = document.querySelector('#userList li.user-selected')?.textContent;
+
+            if (message && recipient) {
+                socket.emit('send_message', { recipient, message, encryption_method: encryptionMethod });
+                document.getElementById('messageInput').value = '';
+            } else {
+                alert('Sélectionnez un utilisateur et saisissez un message.');
+            }
+        }
+
+        // Append encrypted messages
+        function appendEncryptedMessage(sender, message, key, isSender) {
+            const messageList = document.getElementById('messageList');
+            const div = document.createElement('div');
+            div.className = `flex flex-col ${isSender ? 'items-end' : 'items-start'}`;
+            div.innerHTML = `
+                <div class="max-w-md px-4 py-2 rounded-lg break-words ${
+                    isSender ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-800'
+                } shadow">
+                    <p class="font-bold text-sm user-color" style="color: ${
+                        isSender ? '' : getUserColor(sender)
+                    }">${sender}</p>
+                    <p>Message crypté : <code>${message}</code></p>
+                    <p>Clé : <code>${key}</code></p>
+                </div>
+            `;
+            messageList.appendChild(div);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        // Decrypt message
+        function decryptMessage(encryptedMessage, encryptionMethod) {
+            socket.emit('decrypt_message', { message: encryptedMessage, encryption_method: encryptionMethod });
+        }
+
+        // Handle sent messages
+        socket.on('message_sent', function(data) {
+            appendEncryptedMessage('Vous', data.encrypted_message, data.encryption_method, true);
+        });
+
+        // Handle received messages
+        socket.on('receive_message', function(data) {
+            appendEncryptedMessage(data.sender, data.encrypted_message, data.encryption_method, false);
+        });
+
+        // Auto-register
+        window.onload = register;
+    </script>
+</body>
+</html>
