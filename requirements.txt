@@ -1,3 +1,7 @@
-flask
-flask-sqlalchemy
-cryptography
+Flask==2.3.3
+Flask-SocketIO==5.3.2
+cryptography==41.0.4
+sympy==1.12
+python-socketio==4.6.1
+eventlet==0.33.3
+greenlet==3.0.0
