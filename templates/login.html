@@ -3,50 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Secure Chat</title>
+    <title>Secure Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(to bottom, #e0f7fa, #e0f2f1);
+        }
+
+        /* Modernize chat bubbles */
+        .bubble-sent {
+            background: #d1e7dd;
+            border-radius: 15px 15px 0 15px;
+        }
+
+        .bubble-received {
+            background: #f8d7da;
+            border-radius: 15px 15px 15px 0;
+        }
+
+        .scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #90caf9 transparent;
+        }
+
+        .scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .scrollbar::-webkit-scrollbar-thumb {
+            background: #64b5f6;
+            border-radius: 10px;
+        }
+
+        .scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .shadow-custom {
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <div class="h-screen flex items-center justify-center">
-        <div class="bg-white shadow-lg rounded-lg p-8 w-96">
-            <h1 class="text-2xl font-bold text-center mb-6 text-blue-500">Login</h1>
-            <form id="loginForm">
-                <div class="mb-4">
-                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input id="username" name="username" type="text" required class="mt-1 block w-full px-4 py-2 border rounded-lg focus:outline-none" />
+<body class="text-gray-800 font-sans">
+    <div class="flex flex-col h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-500 via-teal-500 to-blue-400 text-white p-4 fixed top-0 left-0 w-full z-10 shadow-custom">
+            <h1 class="text-center text-2xl font-semibold">💬 TP Cryptographie</h1>
+        </header>
+
+        <!-- Main Content -->
+        <div class="flex flex-1 mt-16">
+            <!-- Users List -->
+            <aside class="bg-white w-1/4 p-4 shadow-md overflow-y-auto scrollbar">
+                <h2 class="text-lg font-bold text-teal-500 mb-4">👥 Utilisateurs Connectés</h2>
+                <ul id="userList" class="space-y-2">
+                    <!-- Users dynamically added -->
+                </ul>
+            </aside>
+
+            <!-- Chat Section -->
+            <main class="flex-1 flex flex-col bg-gray-50">
+                <!-- Messages -->
+                <div id="messageList" class="flex-1 p-4 overflow-y-auto scrollbar space-y-4">
+                    <!-- Messages dynamically added -->
                 </div>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg w-full">Login</button>
-            </form>
-            <div id="errorMessage" class="mt-4 text-red-500 text-center hidden"></div>
-            <div class="mt-4 text-center">
-                <a href="/register" class="text-blue-500 hover:underline">Don't have an account? Register here</a>
-            </div>
+
+                <!-- Input Section -->
+                <div class="bg-white shadow-md p-4 flex items-center">
+                    <select id="recipientSelect" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:outline-none mr-4">
+                        <option value="">Destinataire</option>
+                    </select>
+                    <input id="messageInput" 
+                           type="text" 
+                           placeholder="Tapez votre message..." 
+                           class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-teal-400 focus:outline-none mr-4">
+                    <select id="encryptionMethod" class="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-400 focus:outline-none mr-4">
+                        <option value="RSA">RSA</option>
+                        <option value="ElGamal">ElGamal</option>
+                    </select>
+                    <button onclick="sendMessage()" class="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition shadow-md">
+                        Envoyer
+                    </button>
+                </div>
+            </main>
         </div>
     </div>
+
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent default form submission
-            const username = document.getElementById('username').value;
-
-            const response = await fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username }) // Envoyer sous format JSON
+        const socket = io();
+        const username = localStorage.getItem('username');
+    
+        if (!username) {
+            window.location.href = '/'; // Rediriger si pas de nom d'utilisateur
+        }
+    
+        // Enregistrer le nom d'utilisateur sur le serveur
+        socket.emit('register', { username });
+    
+        // Mettre à jour la liste des utilisateurs connectés
+        socket.on('user_list', (users) => {
+            const userList = document.getElementById('userList');
+            const recipientSelect = document.getElementById('recipientSelect');
+            userList.innerHTML = '';
+            recipientSelect.innerHTML = '<option value="">Destinataire</option>';
+    
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user;
+                li.className = 'bg-gray-200 p-2 rounded-lg shadow hover:bg-blue-100 cursor-pointer';
+                userList.appendChild(li);
+    
+                const option = document.createElement('option');
+                option.value = user;
+                option.textContent = user;
+                recipientSelect.appendChild(option);
             });
-
-            if (response.ok) {
-                // Redirection si succès
-                window.location.href = '/';
-            } else {
-                // Afficher un message d'erreur
-                const data = await response.json();
-                const errorMessage = document.getElementById('errorMessage');
-                errorMessage.textContent = data.error || 'Login failed';
-                errorMessage.classList.remove('hidden');
-            }
         });
+    
+        // Afficher les messages reçus
+        socket.on('receive_message', (data) => {
+            const messageList = document.getElementById('messageList');
+            const div = document.createElement('div');
+            div.className = "bg-blue-50 p-4 rounded-lg shadow-md";
+    
+            div.innerHTML = `
+                <p class="font-semibold">${data.sender}</p>
+                <p class="text-sm text-gray-600 break-words max-w-xl">🔒 Message crypté : <span class="font-mono">${data.encrypted_message}</span></p>
+                <p class="text-xs text-gray-500">🔑 Clé publique : <span class="font-mono">${data.public_key}</span></p>
+            `;
+    
+            // Ajouter un bouton "Décrypter" uniquement si le message est destiné à cet utilisateur
+            if (data.recipient === username) {
+                div.innerHTML += `
+                    <button 
+                        onclick="decryptMessage('${data.encrypted_message}', '${data.encryption_method}', this)"
+                        class="mt-2 bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition text-sm"
+                    >
+                        Décrypter le message
+                    </button>
+                    <p class="decrypted-message text-sm text-green-600 mt-2 hidden"></p>
+                `;
+            }
+    
+            messageList.appendChild(div);
+            messageList.scrollTop = messageList.scrollHeight;
+        });
+    
+        // Fonction pour envoyer un message
+        function sendMessage() {
+            const recipient = document.getElementById('recipientSelect').value;
+            const message = document.getElementById('messageInput').value.trim();
+            const encryptionMethod = document.getElementById('encryptionMethod').value;
+    
+            if (!recipient) {
+                alert('Veuillez sélectionner un destinataire.');
+                return;
+            }
+    
+            if (!message) {
+                alert('Veuillez écrire un message.');
+                return;
+            }
+    
+            socket.emit('send_message', {
+                recipient: recipient,
+                message: message,
+                encryption_method: encryptionMethod
+            });
+    
+            const messageList = document.getElementById('messageList');
+            const div = document.createElement('div');
+            div.className = "bg-green-50 p-4 rounded-lg shadow-md break-words max-w-xl";
+            div.innerHTML = `
+                <p class="font-semibold">Vous</p>
+                <p class="text-sm text-gray-600">🔒 Message crypté : <span class="font-mono">${message}</span></p>
+            `;
+            messageList.appendChild(div);
+    
+            document.getElementById('messageInput').value = '';
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+    
+        // Fonction pour décrypter un message
+        function decryptMessage(encryptedMessage, encryptionMethod, button) {
+            socket.emit('decrypt_message', {
+                message: encryptedMessage,
+                encryption_method: encryptionMethod
+            });
+    
+            socket.on('decrypted_message', (data) => {
+                const parent = button.parentElement;
+                const decryptedElement = parent.querySelector('.decrypted-message');
+                decryptedElement.textContent = `🔓✅ Message décrypté : ${data.message}`;
+                decryptedElement.classList.remove('hidden');
+            });
+        }
     </script>
+    
 </body>
 </html>
